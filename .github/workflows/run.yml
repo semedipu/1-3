@@ -1,0 +1,43 @@
+name: Run Bot Parallel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        folder: ['akun-1_2', 'akun-1_3', 'akun-1_4', 'akun-1_5', 'akun-1_6', 'akun-1b']
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib selenium requests
+
+    - name: Download & Extract Files from Google Drive
+      env:
+        GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        DRIVE_FILE_ID: ${{ secrets.DRIVE_FILE_ID }}
+      run: python download_drive.py
+
+    - name: Run Bot Script
+      run: |
+        cd akun-1/${{ matrix.folder }}
+        if [ -f "seofast_hp3.py" ]; then
+          python3 seofast_hp3.py
+        elif [ -f "seofast_zhp.py" ]; then
+          python3 seofast_zhp.py
+        else
+          echo "File script tidak ditemukan!"
+        fi
