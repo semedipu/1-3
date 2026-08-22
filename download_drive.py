@@ -1,49 +1,47 @@
 import os
-import json
+import io
 import zipfile
-from google.oauth2 import service_account
+import json
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-def download_and_extract():
-    # 1. Ambil secret dari environment
-    sa_key_str = os.environ.get('GCP_SA_KEY')
-    file_id = os.environ.get('DRIVE_FILE_ID')
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
-    if not sa_key_str or not file_id:
-        print("[-] Error: Secrets GCP_SA_KEY atau DRIVE_FILE_ID tidak ditemukan!")
-        return
+def get_drive_service():
+    sa_key_info = os.environ.get('GCP_SA_KEY')
+    if not sa_key_info:
+        raise ValueError("GCP_SA_KEY tidak ditemukan!")
+    creds_dict = json.loads(sa_key_info)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    return build('drive', 'v3', credentials=creds)
 
-    # 2. Otentikasi dengan Service Account
-    sa_info = json.loads(sa_key_str)
-    creds = service_account.Credentials.from_service_account_info(
-        sa_info,
-        scopes=['https://www.googleapis.com/auth/drive.readonly']
-    )
-
-    service = build('drive', 'v3', credentials=creds)
-
-    # 3. Download file zip dari Google Drive
-    print("[+] Mengunduh file dari Google Drive...")
+def download_and_extract_zip(service, file_id, file_name):
+    print(f"Downloading {file_name}...")
     request = service.files().get_media(fileId=file_id)
-    zip_filename = "downloaded_akun.zip"
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    fh.seek(0)
+    print(f"Extracting {file_name}...")
+    with zipfile.ZipFile(fh, 'r') as zip_ref:
+        zip_ref.extractall('.')
+    print(f"Selesai: {file_name}")
 
-    with open(zip_filename, 'wb') as f:
-        downloader = MediaIoBaseDownload(f, request)
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-            if status:
-                print(f"    Download progress: {int(status.progress() * 100)}%")
+def scan_folder(service, folder_id):
+    query = f"'{folder_id}' in parents and trashed = false"
+    results = service.files().list(q=query, fields="files(id, name, mimeType)").execute()
+    items = results.get('files', [])
 
-    print("[+] Download selesai!")
+    for item in items:
+        if item['mimeType'] == 'application/vnd.google-apps.folder':
+            scan_folder(service, item['id'])
+        elif item['name'].endswith('.zip'):
+            download_and_extract_zip(service, item['id'], item['name'])
 
-    # 4. Extract file zip
-    print("[+] Ekstrak file zip...")
-    with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
-        zip_ref.extractall(".")
-    
-    print("[+] Ekstrak selesai! File siap digunakan.")
-
-if __name__ == "__main__":
-    download_and_extract()
+if __name__ == '__main__':
+    folder_id = os.environ.get('DRIVE_FOLDER_ID') or os.environ.get('DRIVE_FILE_ID')
+    service = get_drive_service()
+    scan_folder(service, folder_id)
