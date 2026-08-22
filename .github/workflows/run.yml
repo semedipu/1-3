@@ -1,7 +1,10 @@
-name: Run Bot Parallel
+name: Run Bot Parallel 24/7
 
 on:
   workflow_dispatch:
+  schedule:
+    # Jalan otomatis tiap 6 jam 5 menit (Menit ke-5 di jam 00, 06, 12, 18 UTC)
+    - cron: '5 0,6,12,18 * * *'
 
 jobs:
   run-bot:
