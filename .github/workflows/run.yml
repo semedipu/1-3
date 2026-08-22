@@ -34,10 +34,4 @@ jobs:
     - name: Run Bot Script
       run: |
         cd akun-1/${{ matrix.folder }}
-        if [ -f "seofast_hp3.py" ]; then
-          python3 seofast_hp3.py
-        elif [ -f "seofast_zhp.py" ]; then
-          python3 seofast_zhp.py
-        else
-          echo "File script tidak ditemukan!"
-        fi
+        python3 seofast_zhp.py
