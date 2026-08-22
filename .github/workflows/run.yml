@@ -1,4 +1,4 @@
-name: Run Bot Parallel 24/7
+name: ako1 24/7
 
 on:
   workflow_dispatch:
