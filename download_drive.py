@@ -8,49 +8,56 @@ from googleapiclient.http import MediaIoBaseDownload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
-def main():
+def get_service():
     sa_key_info = os.environ.get('GCP_SA_KEY')
-    # Ambil ID folder dari env, bersihkan spasi/enter
-    target_folder_id = (os.environ.get('DRIVE_FOLDER_ID') or os.environ.get('DRIVE_FILE_ID') or '').strip()
-    
-    print(f"Target Folder ID: '{target_folder_id}'")
-    
-    if not sa_key_info or not target_folder_id:
-        raise ValueError("GCP_SA_KEY atau DRIVE_FOLDER_ID/DRIVE_FILE_ID tidak terbaca!")
-
+    if not sa_key_info:
+        raise ValueError("GCP_SA_KEY kosong!")
     creds_dict = json.loads(sa_key_info)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    service = build('drive', 'v3', credentials=creds)
+    return build('drive', 'v3', credentials=creds)
 
-    # Ambil SEMUA file zip yang ada di dalam Drive tanpa dipusingkan struktur folder
-    query = "mimeType = 'application/zip' and trashed = false"
-    
+def fetch_files_in_folder(service, folder_id):
+    """Mencari semua item di dalam folder_id"""
+    query = f"'{folder_id}' in parents and trashed = false"
     results = service.files().list(
         q=query,
-        fields="files(id, name)",
+        fields="files(id, name, mimeType)",
         pageSize=100
     ).execute()
+    return results.get('files', [])
 
-    files = results.get('files', [])
-    print(f"Ditemukan {len(files)} file zip di Google Drive.")
+def process_folder(service, folder_id):
+    items = fetch_files_in_folder(service, folder_id)
+    for item in items:
+        # Jika ketemu sub-folder (seperti akun-1, akun-2), masuk ke dalamnya
+        if item['mimeType'] == 'application/vnd.google-apps.folder':
+            print(f"Memeriksa sub-folder: {item['name']}...")
+            process_folder(service, item['id'])
+        # Jika nama filenya berakhiran .zip
+        elif item['name'].lower().endswith('.zip'):
+            download_and_extract(service, item['id'], item['name'])
 
-    for file in files:
-        f_id = file['id']
-        f_name = file['name']
-        print(f"Mengunduh {f_name} (ID: {f_id})...")
-        
-        request = service.files().get_media(fileId=f_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-        
-        fh.seek(0)
-        print(f"Mengekstrak {f_name}...")
-        with zipfile.ZipFile(fh, 'r') as zip_ref:
-            zip_ref.extractall('.')
-        print(f"Selesai ekstrak: {f_name}\n")
+def download_and_extract(service, file_id, file_name):
+    print(f"--> Mengunduh {file_name}...")
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    
+    fh.seek(0)
+    print(f"--> Mengekstrak {file_name}...")
+    with zipfile.ZipFile(fh, 'r') as zip_ref:
+        zip_ref.extractall('.')
+    print(f"--> Selesai mengekstrak: {file_name}\n")
 
 if __name__ == '__main__':
-    main()
+    target_folder_id = (os.environ.get('DRIVE_FOLDER_ID') or os.environ.get('DRIVE_FILE_ID') or '').strip()
+    print(f"Target Root Folder ID: '{target_folder_id}'")
+    
+    if not target_folder_id:
+        raise ValueError("DRIVE_FOLDER_ID / DRIVE_FILE_ID tidak ditemukan!")
+        
+    srv = get_service()
+    process_folder(srv, target_folder_id)
