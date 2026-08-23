@@ -13,16 +13,17 @@ def main():
     if not sa_key_info:
         raise ValueError("Secret GCP_SA_KEY tidak ditemukan!")
 
-    # Login ke Google Drive API
+    # Mengambil target akun dari environment (misal: "akun-1")
+    target_path = os.environ.get('TARGET_PATH', '')
+    target_account = target_path.split('/')[0] if '/' in target_path else target_path
+
     creds_dict = json.loads(sa_key_info)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     service = build('drive', 'v3', credentials=creds)
 
-    print("Mencari semua file .zip yang bisa diakses Service Account...")
+    print(f"Mencari file .zip di Drive khusus untuk: {target_account}...")
     
-    # Query langsung cari semua file yang namanya berakhiran .zip dan tidak ada di sampah
     query = "name contains '.zip' and trashed = false"
-    
     results = service.files().list(
         q=query,
         fields="files(id, name)",
@@ -30,14 +31,15 @@ def main():
     ).execute()
 
     files = results.get('files', [])
-    print(f"Total file zip ditemukan: {len(files)}")
 
-    if not files:
-        print("PERINGATAN: Tidak ada file zip yang ditemukan! Pastikan Service Account sudah diberi akses Share ke folder/file zip.")
+    # Filter hanya mengunduh zip yang sesuai target akun saja
+    filtered_files = [f for f in files if target_account and target_account in f['name']]
+
+    if not filtered_files:
+        print(f"PERINGATAN: File zip untuk {target_account} tidak ditemukan!")
         return
 
-    # Download & Extract Semua File Zip
-    for file in files:
+    for file in filtered_files:
         f_id = file['id']
         f_name = file['name']
         print(f"--> Mengunduh {f_name} (ID: {f_id})...")
