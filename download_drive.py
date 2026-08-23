@@ -8,63 +8,59 @@ from googleapiclient.http import MediaIoBaseDownload
 
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
+# Filter target akun yang ingin didownload saja
+TARGET_AKUN = ['akun-1', 'akun-2', 'akun-3']
+
 def main():
     sa_key_info = os.environ.get('GCP_SA_KEY')
     if not sa_key_info:
         raise ValueError("Secret GCP_SA_KEY tidak ditemukan!")
 
-    # Mengambil nama target folder (misal dari "akun-1/akun-1b" dipotong jadi "akun-1")
-    target_path = os.environ.get('TARGET_PATH', '')
-    target_account = target_path.split('/')[0] if '/' in target_path else target_path
-
-    if not target_account:
-        print("[!] TARGET_PATH tidak ditemukan, proses dibatalkan.")
-        return
-
-    # Nama file zip persis yang dicari (contoh: "akun-1.zip")
-    exact_zip_name = f"{target_account}.zip"
-
     creds_dict = json.loads(sa_key_info)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     service = build('drive', 'v3', credentials=creds)
 
-    print(f"Mencari file SPESIFIK: '{exact_zip_name}' di Drive...")
+    print("Mencari file zip target di Google Drive...")
+    query = "name contains '.zip' and trashed = false"
     
-    # Query cari nama file yang PERSIS SAMA
-    query = f"name = '{exact_zip_name}' and trashed = false"
     results = service.files().list(
         q=query,
         fields="files(id, name)",
-        pageSize=10
+        pageSize=100
     ).execute()
 
     files = results.get('files', [])
+    print(f"Total file zip di Drive: {len(files)}")
 
     if not files:
-        print(f"[!] PERINGATAN: File '{exact_zip_name}' TIDAK DITEMUKAN di Drive!")
+        print("PERINGATAN: Tidak ada file zip yang ditemukan!")
         return
 
-    # Mengunduh HANYA file yang cocok persis
     for file in files:
         f_id = file['id']
         f_name = file['name']
-        print(f"--> Mengunduh HANYA {f_name} (ID: {f_id})...")
         
-        request = service.files().get_media(fileId=f_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-        
-        fh.seek(0)
-        print(f"--> Mengekstrak {f_name}...")
-        try:
-            with zipfile.ZipFile(fh, 'r') as zip_ref:
-                zip_ref.extractall('.')
-            print(f"--> BERHASIL EKSTRAK: {f_name}\n")
-        except Exception as e:
-            print(f"--> GAGAL EKSTRAK {f_name}: {e}\n")
+        # Cek apakah nama file zip mengandung salah satu target (akun-4, akun-5, atau akun-6)
+        if any(target in f_name for target in TARGET_AKUN):
+            print(f"--> Mengunduh target: {f_name} (ID: {f_id})...")
+            
+            request = service.files().get_media(fileId=f_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            
+            fh.seek(0)
+            print(f"--> Mengekstrak {f_name}...")
+            try:
+                with zipfile.ZipFile(fh, 'r') as zip_ref:
+                    zip_ref.extractall('.')
+                print(f"--> BERHASIL EKSTRAK: {f_name}\n")
+            except Exception as e:
+                print(f"--> GAGAL EKSTRAK {f_name}: {e}\n")
+        else:
+            print(f"--> Melewati {f_name} (Bukan target repository ini)\n")
 
 if __name__ == '__main__':
     main()
