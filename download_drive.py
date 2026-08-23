@@ -13,36 +13,42 @@ def main():
     if not sa_key_info:
         raise ValueError("Secret GCP_SA_KEY tidak ditemukan!")
 
-    # Mengambil target akun dari environment (misal: "akun-1")
+    # Mengambil nama target folder (misal dari "akun-1/akun-1b" dipotong jadi "akun-1")
     target_path = os.environ.get('TARGET_PATH', '')
     target_account = target_path.split('/')[0] if '/' in target_path else target_path
+
+    if not target_account:
+        print("[!] TARGET_PATH tidak ditemukan, proses dibatalkan.")
+        return
+
+    # Nama file zip persis yang dicari (contoh: "akun-1.zip")
+    exact_zip_name = f"{target_account}.zip"
 
     creds_dict = json.loads(sa_key_info)
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     service = build('drive', 'v3', credentials=creds)
 
-    print(f"Mencari file .zip di Drive khusus untuk: {target_account}...")
+    print(f"Mencari file SPESIFIK: '{exact_zip_name}' di Drive...")
     
-    query = "name contains '.zip' and trashed = false"
+    # Query cari nama file yang PERSIS SAMA
+    query = f"name = '{exact_zip_name}' and trashed = false"
     results = service.files().list(
         q=query,
         fields="files(id, name)",
-        pageSize=100
+        pageSize=10
     ).execute()
 
     files = results.get('files', [])
 
-    # Filter hanya mengunduh zip yang sesuai target akun saja
-    filtered_files = [f for f in files if target_account and target_account in f['name']]
-
-    if not filtered_files:
-        print(f"PERINGATAN: File zip untuk {target_account} tidak ditemukan!")
+    if not files:
+        print(f"[!] PERINGATAN: File '{exact_zip_name}' TIDAK DITEMUKAN di Drive!")
         return
 
-    for file in filtered_files:
+    # Mengunduh HANYA file yang cocok persis
+    for file in files:
         f_id = file['id']
         f_name = file['name']
-        print(f"--> Mengunduh {f_name} (ID: {f_id})...")
+        print(f"--> Mengunduh HANYA {f_name} (ID: {f_id})...")
         
         request = service.files().get_media(fileId=f_id)
         fh = io.BytesIO()
