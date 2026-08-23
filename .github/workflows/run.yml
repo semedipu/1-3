@@ -8,6 +8,7 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 330
     strategy:
       fail-fast: false
       matrix:
@@ -49,9 +50,13 @@ jobs:
       env:
         GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FILE_ID }}
+        TARGET_PATH: ${{ matrix.path }}
       run: python download_drive.py
 
-    - name: Run Bot Script
+    - name: Run Bot Script with Auto-Restart
       run: |
         cd ${{ matrix.path }}
-        python3 seofast_zhp.py
+        until python3 seofast_zhp.py; do
+          echo "[!] Bot di ${{ matrix.path }} terhenti/crash (Exit Code: $?). Merestart bot dalam 5 detik..."
+          sleep 5
+        done
