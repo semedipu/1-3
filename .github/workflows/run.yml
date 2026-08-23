@@ -1,4 +1,4 @@
-name: 1-3
+name: 1-2
 
 on:
   workflow_dispatch:
@@ -18,7 +18,6 @@ jobs:
           - path: 'akun-1/akun-1_3'
           - path: 'akun-1/akun-1_4'
           - path: 'akun-1/akun-1_5'
-          - path: 'akun-1/akun-1_6'
 
           # --- akun-2 ---
           - path: 'akun-2/akun-2b'
@@ -26,14 +25,6 @@ jobs:
           - path: 'akun-2/akun-2b_3'
           - path: 'akun-2/akun-2b_4'
           - path: 'akun-2/akun-2b_5'
-          - path: 'akun-2/akun-2b_6'
-
-          # --- akun-3 ---
-          - path: 'akun-3/akun-3'
-          - path: 'akun-3/akun-3_2'
-          - path: 'akun-3/akun-3_3'
-          - path: 'akun-3/akun-3_4'
-          - path: 'akun-3/akun-3_5'
 
     steps:
     - name: Checkout Repository
