@@ -6,6 +6,21 @@ on:
     - cron: '5 0,6,12,18 * * *'
 
 jobs:
+  # JOB 1: Khusus Cek Spesifikasi Runner secara terpisah
+  cek-spek:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Cek Spesifikasi & Resource Runner
+      run: |
+        echo "=== CPU Info ==="
+        nproc
+        lscpu | grep "Model name\|CPU(s):"
+        echo "=== RAM Info ==="
+        free -h
+        echo "=== Disk Info ==="
+        df -h /
+
+  # JOB 2: Eksekusi Bot
   run-bot:
     runs-on: ubuntu-latest
     timeout-minutes: 330
@@ -22,16 +37,6 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
-
-    - name: Cek Spesifikasi Runner
-      run: |
-        echo "=== CPU Info ==="
-        nproc
-        lscpu | grep "Model name\|CPU(s):"
-        echo "=== RAM Info ==="
-        free -h
-        echo "=== Disk Info ==="
-        df -h /
 
     - name: Set up Python
       uses: actions/setup-python@v5
