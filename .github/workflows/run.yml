@@ -1,4 +1,4 @@
-name: "sf1m"
+name: "sm1m"
 
 on:
   workflow_dispatch:
@@ -66,12 +66,12 @@ jobs:
         monitor_thread.start()
 
         def run_bot_loop(bot_dir):
-            cmd = f'until python3 seofast_zhp.py; do echo \"[!] Bot di {bot_dir} terhenti. Restart dalam 5s...\"; sleep 5; done'
+            cmd = f'until python3 sm.py; do echo \"[!] Bot di {bot_dir} terhenti. Restart dalam 5s...\"; sleep 5; done'
             return subprocess.Popen(cmd, shell=True, cwd=bot_dir, executable='/bin/bash')
 
         if os.path.exists(target):
             for root, dirs, files in os.walk(target):
-                if 'seofast_zhp.py' in files:
+                if 'sm.py' in files:
                     print(f'==> Menjalankan Bot dengan Auto-Restart di: {root}')
                     p = run_bot_loop(root)
                     processes.append(p)
