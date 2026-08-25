@@ -6,21 +6,6 @@ on:
     - cron: '5 0,6,12,18 * * *'
 
 jobs:
-  # JOB 1: Khusus Cek Spesifikasi Runner secara terpisah
-  cek-spek:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Cek Spesifikasi & Resource Runner
-      run: |
-        echo "=== CPU Info ==="
-        nproc
-        lscpu | grep "Model name\|CPU(s):"
-        echo "=== RAM Info ==="
-        free -h
-        echo "=== Disk Info ==="
-        df -h /
-
-  # JOB 2: Eksekusi Bot
   run-bot:
     runs-on: ubuntu-latest
     timeout-minutes: 330
@@ -60,13 +45,25 @@ jobs:
         TARGET_ACCOUNT: ${{ matrix.target }}
       run: python download_drive.py
 
-    - name: Run All Subfolder Bots In Parallel with Individual Auto-Restart
+    - name: Run All Subfolder Bots In Parallel with Resource Monitoring
       run: |
         python3 -c "
-        import os, subprocess
+        import os, subprocess, time, threading
 
         target = '${{ matrix.target }}'
         processes = []
+
+        # Otomatis catat RAM & CPU ke log tiap 60 detik
+        def monitor_resources():
+            while True:
+                time.sleep(60)
+                print('\n' + '='*15 + ' MONITOR RESOURCE (REAL-TIME) ' + '='*15, flush=True)
+                subprocess.run(['free', '-h'])
+                subprocess.run(['bash', '-c', 'ps aux --sort=-%mem | head -n 8'])
+                print('='*60 + '\n', flush=True)
+
+        monitor_thread = threading.Thread(target=monitor_resources, daemon=True)
+        monitor_thread.start()
 
         def run_bot_loop(bot_dir):
             cmd = f'until python3 seofast_zhp.py; do echo \"[!] Bot di {bot_dir} terhenti. Restart dalam 5s...\"; sleep 5; done'
