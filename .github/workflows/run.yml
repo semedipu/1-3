@@ -6,7 +6,7 @@ on:
     - cron: '5 0,6,12,18 * * *'
 
 jobs:
-  run-bot:
+  run:
     runs-on: ubuntu-latest
     timeout-minutes: 330
 
@@ -28,11 +28,10 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install Google Chrome & Clean Old Chromedriver
+    - name: Install Google Chrome & Hapus Chromedriver Sistem
       run: |
         sudo apt-get update
         sudo apt-get install -y wget google-chrome-stable
-        # Hapus chromedriver bawaan runner agar tidak mementalkan warning version mismatch
         sudo rm -f /usr/bin/chromedriver
 
     - name: Install Dependencies
