@@ -9,7 +9,13 @@ from googleapiclient.http import MediaIoBaseDownload
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 target_env = os.environ.get('TARGET_ACCOUNT')
-TARGET_SM = [target_env] if target_env else ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+
+# Jika dari runner dapet '1', maka dipaksa cari '1.zip'
+# Jika tidak ada env, default list '1.zip' sampai '10.zip'
+if target_env:
+    TARGET_SM = [f"{target_env}.zip"]
+else:
+    TARGET_SM = ['1.zip', '2.zip', '3.zip', '4.zip', '5.zip', '6.zip', '7.zip', '8.zip', '9.zip', '10.zip']
 
 def main():
     sa_key_info = os.environ.get('GCP_SA_KEY')
@@ -39,7 +45,8 @@ def main():
         f_id = file['id']
         f_name = file['name']
                 
-        if any(target in f_name for target in TARGET_SM):
+        # Cek persis sama dengan '1.zip', '2.zip', dll. (Bukan substring)
+        if f_name in TARGET_SM:
             print(f"--> Mengunduh target: {f_name} (ID: {f_id})...")
             
             request = service.files().get_media(fileId=f_id)
