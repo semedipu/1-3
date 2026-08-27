@@ -9,6 +9,9 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 330
+    permissions:
+      actions: write
+      contents: read
 
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.target }}
@@ -44,6 +47,7 @@ jobs:
         GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FILE_ID }}
         TARGET_ACCOUNT: ${{ matrix.target }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: python download_drive.py
 
     - name: Run All Subfolder Bots In Parallel
