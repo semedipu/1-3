@@ -2,53 +2,14 @@ import os
 import io
 import zipfile
 import json
-import time
-import threading
-import urllib.request
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-
-# ==========================================
-# LOGIKA AUTO-SCHEDULE 3 JAM (TAMBAHAN)
-# ==========================================
-def auto_trigger_3h():
-    # Menunggu pas 3 jam (10800 detik) dari saat workflow dimulai
-    time.sleep(10800)
-    
-    repo = os.environ.get('GITHUB_REPOSITORY')
-    token = os.environ.get('GH_TOKEN')
-    
-    if not repo or not token:
-        return
-
-    url = f"https://api.github.com/repos/{repo}/actions/workflows/run.yml/dispatches"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "Python-Auto-Trigger"
-    }
-    data = json.dumps({"ref": "main"}).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-
-    try:
-        with urllib.request.urlopen(req) as response:
-            if response.status == 204:
-                print("[+] Pas 3 jam! Schedule run berikutnya berhasil dibuat.")
-    except Exception as e:
-        print(f"[!] Gagal auto-trigger: {e}")
-
-# Jalankan timer 3 jam di background thread biar gak ganggu proses download/bot
-threading.Thread(target=auto_trigger_3h, daemon=True).start()
-# ==========================================
-
 
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 target_env = os.environ.get('TARGET_ACCOUNT')
 
-# Jika dari runner dapet '1', maka dipaksa cari '1.zip'
-# Jika tidak ada env, default list '1.zip' sampai '10.zip'
 if target_env:
     TARGET_SM = [f"{target_env}.zip"]
 else:
@@ -82,7 +43,6 @@ def main():
         f_id = file['id']
         f_name = file['name']
                 
-        # Cek persis sama dengan '1.zip', '2.zip', dll. (Bukan substring)
         if f_name in TARGET_SM:
             print(f"--> Mengunduh target: {f_name} (ID: {f_id})...")
             
