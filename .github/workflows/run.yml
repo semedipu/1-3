@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: '5 0,6,12,18 * * *'
 
+# Kunci workflow secara global agar tidak bentrok
+concurrency:
+  group: sm1m-workflow-lock
+  cancel-in-progress: false
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -12,11 +17,6 @@ jobs:
     permissions:
       actions: write
       contents: read
-
-    # Batalkan atau ubah concurrency agar run baru yang dipicu tidak saling bunuh
-    concurrency:
-      group: ${{ github.workflow }}-${{ matrix.target }}
-      cancel-in-progress: false
 
     strategy:
       fail-fast: false
@@ -27,17 +27,20 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # RUNNER BACKGROUND PROCESS: Timer 3 jam independen di level OS
-    - name: Start Independent 3-Hour Auto-Trigger Process
+    # TRIGGER HANYA DIJALANKAN 1 KALI OLEH TARGET '1' (Mencegah spam 10x trigger)
+    - name: Start Independent Auto-Trigger Process
+      if: matrix.target == '1'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         nohup python3 -c "
         import time, os, urllib.request, json
+        # UBAH SESUAI KEBUTUHAN (misal: 10800 untuk 3 jam, atau 300 untuk 5 menit)
         time.sleep(10800)
         repo = os.environ.get('GITHUB_REPOSITORY')
         token = os.environ.get('GH_TOKEN')
-        url = f'https://api.github.com/repos/{repo}/actions/workflows/run.yml/dispatches'
+        # Menembak tepat ke workflow sm1m.yml
+        url = f'https://api.github.com/repos/{repo}/actions/workflows/sm1m.yml/dispatches'
         req = urllib.request.Request(url, method='POST')
         req.add_header('Authorization', f'Bearer {token}')
         req.add_header('Accept', 'application/vnd.github+json')
