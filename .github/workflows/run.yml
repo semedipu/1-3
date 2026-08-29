@@ -2,10 +2,12 @@ name: "sm1m"
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '5 0,6,12,18 * * *'
+    inputs:
+      chain_number:
+        description: "Nomor chain"
+        required: false
+        default: "1"
 
-# Kunci workflow secara global agar tidak bentrok
 concurrency:
   group: sm1m-workflow-lock
   cancel-in-progress: false
@@ -14,6 +16,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 330
+
     permissions:
       actions: write
       contents: read
@@ -24,32 +27,62 @@ jobs:
         target: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 
     steps:
+
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # TRIGGER HANYA DIJALANKAN 1 KALI OLEH TARGET '1' (Mencegah spam 10x trigger)
-    - name: Start Independent Auto-Trigger Process
-      if: matrix.target == '1'
+    - name: Check Mahiji Workflow
+      if: matrix.target == '51'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        nohup python3 -c "
-        import time, os, urllib.request, json
-        # UBAH SESUAI KEBUTUHAN (misal: 10800 untuk 3 jam, atau 300 untuk 5 menit)
-        time.sleep(10800)
-        repo = os.environ.get('GITHUB_REPOSITORY')
-        token = os.environ.get('GH_TOKEN')
-        # Menembak tepat ke workflow sm1m.yml
-        url = f'https://api.github.com/repos/{repo}/actions/workflows/sm1m.yml/dispatches'
-        req = urllib.request.Request(url, method='POST')
-        req.add_header('Authorization', f'Bearer {token}')
-        req.add_header('Accept', 'application/vnd.github+json')
-        data = json.dumps({'ref': 'main'}).encode('utf-8')
-        try:
-            urllib.request.urlopen(req, data=data)
-        except Exception as e:
-            print(e)
-        " > /dev/null 2>&1 &
+        echo "=========================================="
+        echo "Workflow yang tersedia:"
+        echo "=========================================="
+
+        gh workflow list
+
+        echo ""
+        echo "=========================================="
+        echo "Workflow sekarang:"
+        echo "${{ github.workflow }}"
+        echo "File:"
+        echo "${{ github.workflow_ref }}"
+        echo "=========================================="
+
+    - name: Create Next Chain
+      if: matrix.target == '51'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CURRENT_CHAIN: ${{ inputs.chain_number }}
+      run: |
+        set -e
+
+        NEXT_CHAIN=$((CURRENT_CHAIN + 1))
+
+        echo "=========================================="
+        echo "CURRENT CHAIN : #${CURRENT_CHAIN}"
+        echo "NEXT CHAIN    : #${NEXT_CHAIN}"
+        echo "=========================================="
+
+        echo ""
+        echo "Menunggu 60 detik..."
+        sleep 60
+
+        echo ""
+        echo "=========================================="
+        echo "MEMBUAT WORKFLOW #${NEXT_CHAIN}"
+        echo "=========================================="
+
+        gh workflow run mahiji \
+          --repo "${GITHUB_REPOSITORY}" \
+          --ref main \
+          -f chain_number="${NEXT_CHAIN}"
+
+        echo ""
+        echo "=========================================="
+        echo "BERHASIL MEMBUAT #${NEXT_CHAIN}"
+        echo "=========================================="
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -65,37 +98,69 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib selenium requests selenium-stealth undetected-chromedriver
+
+        pip install \
+          google-api-python-client \
+          google-auth-httplib2 \
+          google-auth-oauthlib \
+          selenium \
+          requests \
+          selenium-stealth \
+          undetected-chromedriver
 
     - name: Download & Extract Files from Google Drive
       env:
         GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FILE_ID }}
         TARGET_ACCOUNT: ${{ matrix.target }}
-      run: python download_drive.py
+      run: |
+        python download_drive.py
 
     - name: Run All Subfolder Bots In Parallel
       run: |
         python3 -c "
-        import os, subprocess
+        import os
+        import subprocess
 
         target = '${{ matrix.target }}'
         processes = []
 
         def run_bot_loop(bot_dir):
-            cmd = f'until python3 sm.py; do echo \"[!] Bot di {bot_dir} terhenti. Restart dalam 5s...\"; sleep 5; done'
-            return subprocess.Popen(cmd, shell=True, cwd=bot_dir, executable='/bin/bash')
+            cmd = '''
+            until python3 sm.py; do
+                echo \"[!] Bot di {bot_dir} terhenti. Restart dalam 5s...\"
+                sleep 5
+            done
+            '''
+
+            return subprocess.Popen(
+                cmd,
+                shell=True,
+                cwd=bot_dir,
+                executable='/bin/bash'
+            )
 
         if os.path.exists(target):
+
             for root, dirs, files in os.walk(target):
+
                 if 'sm.py' in files:
-                    print(f'==> Menjalankan Bot dengan Auto-Restart di: {root}')
+
+                    print(
+                        f'==> Menjalankan Bot dengan Auto-Restart di: {root}'
+                    )
+
                     p = run_bot_loop(root)
                     processes.append(p)
 
             for p in processes:
                 p.wait()
+
         else:
-            print(f'[!] ERROR: Folder {target} tidak ditemukan!')
+
+            print(
+                f'[!] ERROR: Folder {target} tidak ditemukan!'
+            )
+
             exit(1)
         "
